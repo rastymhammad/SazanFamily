@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>شەجەرەی عەشیرەتی سازانی</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="sazan-logo.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://balkan.app/js/OrgChart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @font-face {
+            font-family: 'Rudaw';
+            src: url('rudawregular2.ttf') format('truetype'); 
+        }
+        body { 
+            font-family: 'Rudaw', Tahoma, Arial, sans-serif; 
+            background-color: #f3f4f6; 
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            overflow: hidden;
+        }
+        
+        /* هیدەرەکە فیکس کراوە بە بەرزییەکی دیاریکراو */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 105px;
+            z-index: 50;
+        }
+
+        /* نەخشەکە بە تەواوی لە ژێر هیدەرەکەوە دەست پێدەکات بێ هیچ بۆشاییەکی سپی */
+        #tree { 
+            width: 100%; 
+            height: calc(100vh - 105px); 
+            margin-top: 105px; 
+            padding: 0;
+            box-sizing: border-box;
+            background-color: #f3f4f6;
+        }
+        
+        .balkan-orgchart-node rect { cursor: pointer; rx: 12; ry: 12; }
+        .balkan-search { display: none !important; }
+        
+        a[href*="balkan.app"], [data-balkan-watermark] {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+
+        #searchSuggestions::-webkit-scrollbar { width: 5px; }
+        #searchSuggestions::-webkit-scrollbar-track { background: #f1f1f1; }
+        #searchSuggestions::-webkit-scrollbar-thumb { background: #888; border-radius: 5px; }
+
+        @keyframes loadingFill {
+            0% { width: 0%; }
+            40% { width: 50%; }
+            80% { width: 90%; }
+            100% { width: 100%; }
+        }
+        .animate-loading-bar {
+            animation: loadingFill 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        
+        .fade-out {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- شاشەی لۆدینگ -->
+    <div id="splashScreen" class="fixed inset-0 bg-gray-50 z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
+        <div class="w-32 h-32 rounded-3xl overflow-hidden shadow-[0_10px_25px_rgba(0,0,0,0.15)] mb-6 border border-gray-200 transform transition-transform hover:scale-105">
+            <img src="sazan-logo.png" alt="لۆگۆی سازان" class="w-full h-full object-cover" onerror="this.src='https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png'">
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-8 select-none tracking-wider text-center">شەجەرەی سازان</h2>
+        <div class="w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+            <div class="h-full bg-blue-600 rounded-full animate-loading-bar"></div>
+        </div>
+    </div>
+
+    <!-- هیدەری سەرەوە -->
+    <header class="bg-blue-600 text-white shadow-md py-2 px-4 flex flex-col items-center justify-center gap-1.5">
+        <div class="w-full max-w-md flex flex-col items-center gap-1.5">
+            
+            <h1 class="text-sm md:text-base font-bold select-none text-center">شەجەرەی عەشیرەتی سازانی</h1>
+            
+            <div class="w-full relative">
+                <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-blue-200">
+                    <i class="fa-solid fa-magnifying-glass text-[11px]"></i>
+                </span>
+                <input type="text" id="customSearchInput" oninput="handleSearchInput()" onclick="handleSearchInput()" placeholder="گــــه‌ڕان" class="w-full bg-blue-700 text-white placeholder-blue-200 text-xs rounded-lg py-1 pr-8 pl-3 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-inner text-right relative z-10" dir="rtl" autocomplete="off">
+                
+                <ul id="searchSuggestions" class="absolute left-0 right-0 top-full mt-1 bg-white text-gray-800 shadow-xl rounded-lg max-h-48 overflow-y-auto z-50 hidden border border-gray-200 divide-y divide-gray-100 text-right">
+                </ul>
+            </div>
+
+            <div class="flex items-center gap-3 text-[11px] font-bold bg-blue-700/90 px-3 py-1 rounded-full shadow-inner border border-blue-400/30">
+                <span class="flex items-center gap-1 text-green-300">
+                    <i class="fa-solid fa-user"></i> زیندوان: <span id="aliveCount">0</span>
+                </span>
+                <span class="text-blue-300">|</span>
+                <!-- ڕەنگی سوور لێرەدا زیاد کراوە -->
+                <span class="flex items-center gap-1 text-red-500 font-extrabold drop-shadow-sm">
+                    <i class="fa-solid fa-skull"></i> کۆچکردووان: <span id="deceasedCount">0</span>
+                </span>
+            </div>
+        </div>
+
+        <div id="adminControls" class="hidden absolute left-3 top-2.5 flex items-center gap-1.5">
+            <button onclick="openAddForm('root')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-0.5 rounded shadow text-[10px] font-bold transition">
+                + سەرەتا
+            </button>
+            <button onclick="adminLogout()" class="bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded shadow text-[10px] font-bold transition">
+                دەرچوون
+            </button>
+        </div>
+    </header>
+
+    <!-- شوێنی شەجەرەکە -->
+    <div id="tree"></div>
+
+    <!-- مێنوی خوارەوە -->
+    <nav id="floatingNav" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-fit px-8 py-2 bg-black/75 backdrop-blur-md border border-gray-700 shadow-[0_10px_40px_rgba(0,0,0,0.5)] rounded-full flex justify-center items-center gap-6 z-40 transition-all duration-500 ease-in-out">
+        <button onclick="goToHome()" class="flex flex-col items-center justify-center text-blue-400 hover:text-blue-300 transition group">
+            <i class="fa-solid fa-house text-xl mb-1 drop-shadow-[0_0px_8px_rgba(96,165,250,0.6)] group-hover:scale-110 transition-transform"></i>
+            <span class="text-[10px] font-bold tracking-wide">سەرەکی</span>
+        </button>
+        <div class="w-px h-7 bg-gray-600/60"></div>
+        <button onclick="openInfoModal()" class="flex flex-col items-center justify-center text-gray-300 hover:text-white transition group">
+            <i class="fa-solid fa-circle-info text-xl mb-1 drop-shadow-[0_0px_8px_rgba(255,255,255,0.3)] group-hover:scale-110 transition-transform"></i>
+            <span class="text-[10px] font-bold tracking-wide">ئامادەکردن</span>
+        </button>
+    </nav>
+
+    <!-- پەنجەرەی ئامادەکردن و پەیوەندی -->
+    <div id="infoModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-[50] p-0 sm:p-4">
+        <div class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl p-6 text-center transform transition-transform translate-y-0 relative">
+            <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-5"></div>
+            <h3 class="text-xl font-bold text-gray-800 mb-6">زانیاری و پەیوەندی</h3>
+            
+            <div class="flex justify-center items-center space-x-8 space-x-reverse text-4xl mb-8">
+                <button onclick="openShareModal()" class="text-gray-400 hover:text-blue-500 transition transform hover:scale-110" title="بڵاوکردنەوە">
+                    <i class="fa-solid fa-share-nodes"></i>
+                </button>
+                <a href="https://www.facebook.com/share/18QrzRJGgM/?mibextid=wwXIfr" target="_blank" class="text-blue-600 hover:text-blue-700 transition transform hover:scale-110" title="فەیسبووک">
+                    <i class="fab fa-facebook"></i>
+                </a>
+                <a href="https://wa.me/96475011162112" target="_blank" class="text-green-500 hover:text-green-600 transition transform hover:scale-110" title="واتسئەپ">
+                    <i class="fab fa-whatsapp"></i>
+                </a>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                <p id="adminTrigger" class="cursor-pointer select-none text-sm text-gray-700 font-bold hover:text-blue-600 transition">ئامادەکردنی: ڕاستی محمد شێخ حیدر</p>
+            </div>
+            
+            <button onclick="closeInfoModal()" class="mt-6 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 rounded-xl font-bold transition text-sm">داخستن</button>
+        </div>
+    </div>
+
+    <!-- پەنجەرەی بڵاوکردنەوە (Share) -->
+    <div id="shareModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-end sm:items-center justify-center z-[80] p-0 sm:p-4">
+        <div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-3xl shadow-2xl p-6 text-center transform transition-transform translate-y-0 relative">
+            <button onclick="closeShareModal()" class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-lg p-1 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <h3 class="text-lg font-bold text-gray-800 mb-6 mt-2">بڵاوکردنەوە لە ڕێگەی...</h3>
+            
+            <div class="grid grid-cols-4 gap-4 mb-6" dir="ltr">
+                <button onclick="shareVia('whatsapp')" class="flex flex-col items-center gap-2">
+                    <div class="w-14 h-14 bg-green-500 text-white rounded-full flex items-center justify-center text-3xl shadow-lg hover:bg-green-600 transition transform hover:scale-105">
+                        <i class="fab fa-whatsapp"></i>
+                    </div>
+                    <span class="text-[11px] font-bold text-gray-600">WhatsApp</span>
+                </button>
+                <button onclick="shareVia('viber')" class="flex flex-col items-center gap-2">
+                    <div class="w-14 h-14 bg-[#7360f2] text-white rounded-full flex items-center justify-center text-3xl shadow-lg hover:bg-[#5a48cf] transition transform hover:scale-105">
+                        <i class="fab fa-viber"></i>
+                    </div>
+                    <span class="text-[11px] font-bold text-gray-600">Viber</span>
+                </button>
+                <button onclick="shareVia('messenger')" class="flex flex-col items-center gap-2">
+                    <div class="w-14 h-14 bg-[#00B2FF] text-white rounded-full flex items-center justify-center text-3xl shadow-lg hover:bg-[#0099db] transition transform hover:scale-105">
+                        <i class="fab fa-facebook-messenger"></i>
+                    </div>
+                    <span class="text-[11px] font-bold text-gray-600">Messenger</span>
+                </button>
+                <button onclick="shareVia('telegram')" class="flex flex-col items-center gap-2">
+                    <div class="w-14 h-14 bg-[#0088cc] text-white rounded-full flex items-center justify-center text-3xl shadow-lg hover:bg-[#0070a8] transition transform hover:scale-105">
+                        <i class="fab fa-telegram-plane"></i>
+                    </div>
+                    <span class="text-[11px] font-bold text-gray-600">Telegram</span>
+                </button>
+            </div>
+            
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-2 flex items-center gap-2">
+                <input type="text" id="shareLinkInput" readonly class="bg-transparent w-full text-left text-xs text-gray-500 px-2 outline-none" dir="ltr" value="">
+                <button onclick="copyShareLink()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap">کۆپیکردن</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- پۆپ ئەپی دابەزاندنی ئەپڵیکەیشن (PWA) -->
+    <div id="appDownloadModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[110] p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center relative animate-bounce-short">
+            <button onclick="dismissAppModal()" class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-lg p-1 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <div class="w-24 h-24 mx-auto mb-4 rounded-3xl overflow-hidden shadow-[0_4px_15px_rgba(0,0,0,0.15)] border border-gray-100">
+                <img src="sazan-logo.png" alt="لۆگۆی سازان" class="w-full h-full object-cover" onerror="this.src='https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png'">
+            </div>
+            
+            <h3 class="text-xl font-bold text-gray-800 mb-2">ئەپڵیکەیشنی عەشیرەتی سازانی</h3>
+            <p class="text-sm text-gray-600 mb-6 px-2">بۆ بەکارهێنانی خێرا و ئاسانتر لەسەر مۆبایلەکەت، ئێستا ئەپەکە دابەزێنە!</p>
+            <div class="flex flex-col gap-2">
+                <button onclick="installApp()" class="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-lg transition text-sm flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-download"></i> دابەزاندنی ئەپڵیکەیشن
+                </button>
+                <button onclick="dismissAppModal()" class="text-gray-500 hover:text-gray-700 py-2 font-medium transition text-xs mt-1">پاشگەزبوونەوە</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- پەنجەرەی داوای پاسۆردی ئەدمین -->
+    <div id="passwordModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-right">
+            <h3 class="text-lg font-bold mb-3 text-gray-800 border-b pb-2">چوونەژوورەوەی ئەدمین</h3>
+            <p class="text-sm text-gray-600 mb-3">تکایە پاسۆردی ئەدمین بنووسە:</p>
+            <input type="password" id="adminPasswordInput" class="w-full px-3 py-2 border rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left" dir="ltr" placeholder="••••••••">
+            <div class="flex justify-end space-x-2 space-x-reverse">
+                <button type="button" onclick="closePasswordModal()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded text-sm">پاشگەزبوونەوە</button>
+                <button type="button" onclick="verifyAdminPassword()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">باشە</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- پەنجەرەی ناوەڕاست بۆ زانیاری کەسەکان -->
+    <div id="nodeDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[75] p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6 text-center relative animate-bounce-short">
+            <button onclick="closeNodeDetailsModal()" class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-lg p-1 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <div class="w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden shadow-md border-2 border-blue-500 p-0.5 bg-white relative">
+                <img id="detailImage" src="" alt="Profile" class="w-full h-full object-cover rounded-full" onerror="this.src='https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png'">
+            </div>
+            
+            <h3 id="detailName" class="text-lg font-bold text-gray-800 mb-1"></h3>
+            <p id="detailPhone" class="text-sm text-gray-500 font-medium mb-2" dir="ltr"></p>
+            
+            <p id="detailDescription" class="hidden text-xs text-gray-700 bg-blue-50 border border-blue-100 p-3 rounded-xl mb-3 leading-relaxed text-right"></p>
+            
+            <div id="detailAdminActions" class="hidden flex-col gap-2 mt-4 pt-4 border-t border-gray-100">
+                <button onclick="openAddForm('son')" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-child"></i> زیادکردنی کوڕ بۆ ئەم کەسە
+                </button>
+                <button onclick="openAddForm('father')" class="bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user-tie"></i> زیادکردنی باوک (بۆ سەرووی ئەم کەسە)
+                </button>
+                <button onclick="openEditForm()" class="bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-pen-to-square"></i> دەستکاریکردنی زانیارییەکان
+                </button>
+                <button onclick="confirmDeleteMember()" class="bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-trash"></i> سڕینەوەی ئەم کەسە
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- فۆڕمی زیادکردن/دەستکاریکردنی ناو -->
+    <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[85] p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <h2 id="modalTitle" class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">زیادکردنی ئەندامی نوێ</h2>
+            <form id="addMemberForm" onsubmit="submitForm(event)">
+                <input type="hidden" id="targetMemberId">
+                <input type="hidden" id="actionType">
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">ناوی سیانی:</label>
+                    <input type="text" id="newName" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-right" dir="rtl">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">زانیاری زیاتر (بنووسە کۆچی دوایی کردووە، مردوو، منداڵی...):</label>
+                    <textarea id="newDescription" rows="2" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-right" dir="rtl" placeholder="نموونە: بە منداڵی کۆچی دوایی کردووە"></textarea>
+                </div>
+                
+                <div class="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">ڕەنگی بۆکس و هێڵەکەی (تایبەت):</label>
+                    <div class="flex items-center gap-3">
+                        <input type="color" id="newColor" value="" class="w-12 h-10 border-0 rounded cursor-pointer p-0 bg-transparent" title="کلیک بکە بۆ گۆڕینی ڕەنگ">
+                        <span class="text-[10px] text-gray-500">ئەگەر دەتەوێت هێڵی باوک و کوڕەکە ڕەنگێکی تایبەتی هەبێت، لێرە هەڵیبژێرە.</span>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">لینکی وێنە (ئارەزوومەندانە):</label>
+                    <input type="text" id="newImage" placeholder="https://... یان ناوی فایلەکە لێرە بنووسە" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-left" dir="ltr">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">ژمارە مۆبایل (ئارەزوومەندانە):</label>
+                    <input type="tel" id="newPhone" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-left" dir="ltr">
+                </div>
+                <div class="flex justify-end space-x-2 space-x-reverse">
+                    <button type="button" onclick="closeModal()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded">پاشگەزبوونەوە</button>
+                    <button type="submit" id="saveBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">پاشەکەوتکردن</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        setInterval(() => {
+            document.querySelectorAll('a').forEach(el => {
+                if (el.href && el.href.includes('balkan.app')) el.remove();
+            });
+            document.querySelectorAll('div').forEach(el => {
+                if (el.textContent && (el.textContent.includes('The evaluation version') || el.textContent.includes('requires internet connection'))) {
+                    el.remove();
+                }
+            });
+        }, 100);
+
+        const branchColors = [
+            { fill: '#2563eb', stroke: '#1d4ed8' }, 
+            { fill: '#ef4444', stroke: '#b91c1c' }, 
+            { fill: '#10b981', stroke: '#047857' }, 
+            { fill: '#f59e0b', stroke: '#b45309' }, 
+            { fill: '#8b5cf6', stroke: '#6d28d9' }, 
+            { fill: '#ec4899', stroke: '#be185d' }, 
+            { fill: '#14b8a6', stroke: '#0f766e' }, 
+            { fill: '#6366f1', stroke: '#4338ca' }, 
+            { fill: '#f43f5e', stroke: '#be123c' }, 
+            { fill: '#84cc16', stroke: '#4d7c0f' }  
+        ];
+
+        const floatingNav = document.getElementById('floatingNav');
+        let navTimeout;
+
+        function showNav() {
+            if (floatingNav) {
+                floatingNav.style.opacity = '1';
+                floatingNav.style.transform = 'translate(-50%, 0)';
+                floatingNav.style.pointerEvents = 'auto';
+                clearTimeout(navTimeout);
+                navTimeout = setTimeout(() => {
+                    floatingNav.style.opacity = '0';
+                    floatingNav.style.transform = 'translate(-50%, 150%)'; 
+                    floatingNav.style.pointerEvents = 'none';
+                }, 3000);
+            }
+        }
+
+        window.addEventListener('scroll', showNav);
+        window.addEventListener('touchstart', showNav);
+        window.addEventListener('touchmove', showNav);
+        window.addEventListener('mousemove', showNav);
+        window.addEventListener('click', showNav);
+        showNav();
+
+        // ڕێکخستنی دەرکەوتنی پۆپ ئەپی دابەزاندن دوای لۆدینگ
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const splash = document.getElementById('splashScreen');
+                if(splash) {
+                    splash.classList.add('fade-out');
+                    setTimeout(() => { splash.style.display = 'none'; }, 500);
+                }
+
+                if (localStorage.getItem('sazan_app_dismissed') !== 'true') {
+                    setTimeout(() => {
+                        const appModal = document.getElementById('appDownloadModal');
+                        if (appModal) appModal.classList.remove('hidden');
+                    }, 500); 
+                }
+            }, 2100);
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => console.log(err));
+            });
+        }
+
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+
+        async function installApp() {
+            document.getElementById('appDownloadModal').classList.add('hidden');
+            
+            if (deferredPrompt) {
+                // بۆ ئەندرۆید: ڕاستەوخۆ دادەبەزێت کاتێک کلیک دەکات
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+            } else {
+                // بۆ ئایفۆن (کە ڕێگە نادات بە ڕاستەوخۆ دابەزاندن) نامەیەکی ڕوونکردنەوەی بۆ دەردەچێت
+                const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+                if (isIos) {
+                    alert("تێبینی بۆ بەکارهێنەرانی ئایفۆن:\n\nسیستەمی ئەپڵ (iOS) ڕێگە بە دابەزاندنی ڕاستەوخۆ نادات. بۆ دابەزاندنی ئەپەکە:\n١. کلیک لە دوگمەی ⍐ (Share) بکە لە خوارەوەی شاشەکە.\n٢. پاشان 'Add to Home Screen' هەڵبژێرە.");
+                } else {
+                    alert("ببورە، مۆبایلەکەت ڕێگە بە دابەزاندنی خێرا نادات. تکایە لە مینیوی براوسەرەکەتەوە (Add to Home screen) هەڵبژێرە.");
+                }
+            }
+        }
+
+        function dismissAppModal() {
+            document.getElementById('appDownloadModal').classList.add('hidden');
+            localStorage.setItem('sazan_app_dismissed', 'true');
+        }
+
+        function openInfoModal() {
+            document.getElementById('infoModal').classList.remove('hidden');
+            showNav(); 
+        }
+
+        function closeInfoModal() {
+            document.getElementById('infoModal').classList.add('hidden');
+        }
+
+        function openShareModal() {
+            closeInfoModal();
+            document.getElementById('shareLinkInput').value = window.location.href;
+            document.getElementById('shareModal').classList.remove('hidden');
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.add('hidden');
+        }
+
+        function shareVia(platform) {
+            const siteUrl = encodeURIComponent(window.location.href);
+            const text = encodeURIComponent('سەیری شەجەرەی خێزانی عەشیرەتی سازانی بکە: ');
+            let shareLink = '';
+            switch (platform) {
+                case 'whatsapp': shareLink = `https://wa.me/?text=${text}${siteUrl}`; break;
+                case 'viber': shareLink = `viber://forward?text=${text}${siteUrl}`; break;
+                case 'messenger': shareLink = `fb-messenger://share/?link=${siteUrl}`; break;
+                case 'telegram': shareLink = `https://t.me/share/url?url=${siteUrl}&text=${text}`; break;
+            }
+            window.open(shareLink, '_blank');
+            closeShareModal();
+        }
+
+        function copyShareLink() {
+            const input = document.getElementById('shareLinkInput');
+            input.select();
+            input.setSelectionRange(0, 99999); 
+            try {
+                document.execCommand('copy');
+                alert('لینکەکە بە سەرکەوتوویی کۆپی کرا!');
+            } catch (err) {
+                alert('نەتوانرا کۆپی بکرێت.');
+            }
+        }
+
+        // لێرەدا APIـیەکە گۆڕدراوە بۆ HTTPS بۆ ئەوەی لە GitHub Pages بێ کێشە کار بکات
+        const apiUrl = 'https://SazanFamily.somee.com/api/Family';
+        let chart = null;
+        let allMembersData = [];
+        let clickCount = 0;
+        let clickTimer;
+        let isAdminLoggedIn = false;
+        let inactivityTimer;
+        let selectedNodeId = null;
+        let selectedNodeName = '';
+
+        OrgChart.templates.ana.size = [420, 110];
+        OrgChart.templates.ana.field_0 = '<text data-text-overflow="multiline" style="font-size: 32px;" fill="#ffffff" font-weight="bold" x="180" y="45" text-anchor="middle">{val}</text>';
+        OrgChart.templates.ana.field_1 = '<text data-text-overflow="multiline" style="font-size: 15px;" fill="#ffffff" x="180" y="82" text-anchor="middle">{val}</text>';
+        // دروستکردنی شوێنی فەرمی بۆ کەلەسەرەکە لەناو قاڵبەکەدا بۆ ئەوەی هەرگیز ون نەبێت
+        OrgChart.templates.ana.field_2 = '<text style="font-size: 26px;" x="40" y="38" text-anchor="middle">{val}</text>';
+        OrgChart.templates.ana.img_0 = '<image preserveAspectRatio="xMidYMid slice" xlink:href="{val}" x="320" y="12" width="85" height="85" rx="42.5"></image>';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('sazan_admin_auth') === 'true') {
+                loginAdmin();
+            }
+            loadFamilyTree();
+            setupInactivityTimer();
+        });
+
+        function normalizeText(text) {
+            if (!text) return "";
+            return text.toString().toLowerCase()
+                .replace(/ڕ/g, 'ر')
+                .replace(/ي/g, 'ی')
+                .replace(/ى/g, 'ی')
+                .replace(/ێ/g, 'ی')
+                .replace(/ە/g, 'ه')
+                .replace(/ة/g, 'ه')
+                .replace(/ۆ/g, 'و')
+                .replace(/ؤ/g, 'و')
+                .replace(/أ/g, 'ا')
+                .replace(/إ/g, 'ا')
+                .replace(/ئ/g, 'ا')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function goToHome() {
+            if (chart) { 
+                let rootNode = allMembersData.find(m => !m.parentId || !allMembersData.some(p => p.id == m.parentId));
+                if (rootNode) {
+                    chart.center(rootNode.id, null, {top: 30});
+                } else {
+                    chart.fit();
+                }
+            }
+            document.getElementById('customSearchInput').value = '';
+            document.getElementById('searchSuggestions').classList.add('hidden');
+            let styleObj = document.getElementById('searchHighlightStyle');
+            if (styleObj) styleObj.innerHTML = '';
+        }
+
+        function loginAdmin() {
+            isAdminLoggedIn = true;
+            localStorage.setItem('sazan_admin_auth', 'true');
+            document.getElementById('adminControls').classList.remove('hidden');
+            resetInactivityTimer();
+            if (chart) loadFamilyTree();
+        }
+
+        function adminLogout() {
+            isAdminLoggedIn = false;
+            localStorage.removeItem('sazan_admin_auth');
+            document.getElementById('adminControls').classList.add('hidden');
+            alert("بە سەرکەوتوویی لە بەشی ئەدمین دەرچوویت.");
+            loadFamilyTree();
+        }
+
+        function setupInactivityTimer() {
+            const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+            events.forEach(event => { window.addEventListener(event, resetInactivityTimer); });
+        }
+
+        function resetInactivityTimer() {
+            if (!isAdminLoggedIn) return;
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                adminLogout();
+                alert("بەهۆی نەبوونی هیچ جموجۆڵێک بۆ ماوەی ۱ دەقە، ئەدمین بە شێوەیەکی خۆکار داخرا.");
+            }, 60000);
+        }
+
+        document.getElementById('adminTrigger').addEventListener('click', () => {
+            if (isAdminLoggedIn) {
+                alert("تۆ پێشتر وەک ئەدمین چوویتە ژوورەوە!");
+                closeInfoModal();
+                return;
+            }
+            clickCount++;
+            clearTimeout(clickTimer);
+            if (clickCount >= 5) {
+                closeInfoModal();
+                document.getElementById('passwordModal').classList.remove('hidden');
+                document.getElementById('adminPasswordInput').value = '';
+                document.getElementById('adminPasswordInput').focus();
+                clickCount = 0;
+            } else {
+                clickTimer = setTimeout(() => { clickCount = 0; }, 2000);
+            }
+        });
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.add('hidden');
+        }
+
+        async function verifyAdminPassword() {
+            let password = document.getElementById('adminPasswordInput').value;
+            if (password) {
+                try {
+                    const response = await fetch(apiUrl + '/VerifyPassword', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ Password: password })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        loginAdmin();
+                        closePasswordModal();
+                        alert("پاسۆردەکە ڕاستە! بەشی ئەدمین چالاک بوو.");
+                    } else {
+                        alert("پاسۆردەکە هەڵەیە!");
+                    }
+                } catch (error) {
+                    alert("نەتوانرا پەیوەندی بە سێرڤەرەوە بکرێت.");
+                }
+            }
+        }
+
+        function applyBranchColors(data) {
+            let rootNodes = data.filter(m => !m.parentId || !data.some(p => p.id == m.parentId));
+            let cssRules = [];
+            
+            cssRules.push(`
+                .balkan-orgchart svg path.link, 
+                .balkan-orgchart svg path[data-l-id],
+                path[data-l-id] { 
+                    stroke-width: 6px !important; 
+                }
+            `);
+
+            rootNodes.forEach((root, index) => {
+                let className = 'branch_' + index;
+                function assignBranch(nodeId) {
+                    let node = data.find(m => m.id == nodeId);
+                    if(node) {
+                        node.branchClass = className;
+                        node.branchIndex = index;
+                    }
+                    let children = data.filter(m => m.parentId == nodeId);
+                    children.forEach(child => assignBranch(child.id));
+                }
+                assignBranch(root.id);
+                
+                let colorObj = branchColors[index % branchColors.length];
+                cssRules.push(`
+                    g.node.${className} rect,
+                    .${className} rect { 
+                        fill: ${colorObj.fill} !important; 
+                        stroke: ${colorObj.stroke} !important; 
+                        stroke-width: 3px !important;
+                    }
+                `);
+            });
+
+            data.forEach(node => {
+                if(node.parentId && node.branchIndex !== undefined) {
+                    let colorObj = branchColors[node.branchIndex % branchColors.length];
+                    cssRules.push(`
+                        path[data-l-id="[${node.parentId}][${node.id}]"],
+                        path[data-l-id$="][${node.id}]"] { 
+                            stroke: ${colorObj.fill} !important; 
+                        }
+                    `);
+                }
+            });
+
+            data.forEach(node => {
+                if (node.color) {
+                    cssRules.push(`
+                        .balkan-orgchart svg g.node[node-id="${node.id}"] rect,
+                        g.node[node-id="${node.id}"] rect { 
+                            fill: ${node.color} !important; 
+                            stroke: ${node.color} !important; 
+                        }
+                    `);
+                    if (node.parentId) {
+                        cssRules.push(`
+                            path[data-l-id="[${node.parentId}][${node.id}]"],
+                            path[data-l-id$="][${node.id}]"] { 
+                                stroke: ${node.color} !important; 
+                            }
+                        `);
+                    }
+                }
+            });
+
+            // ڕەنگی بۆکسەکە بۆ سووری توند بۆ کەسانی کۆچی دوایی کردوو
+            data.forEach(node => {
+                if (node.isDeceased) {
+                    cssRules.push(`
+                        .balkan-orgchart svg g.node[node-id="${node.id}"] rect,
+                        g.node[node-id="${node.id}"] rect { 
+                            fill: #dc2626 !important; 
+                            stroke: #991b1b !important; 
+                            stroke-width: 4px !important; 
+                        }
+                    `);
+                }
+            });
+
+            let styleElem = document.getElementById('dynamicBranchColors');
+            if (!styleElem) {
+                styleElem = document.createElement('style');
+                styleElem.id = 'dynamicBranchColors';
+                document.head.appendChild(styleElem);
+            }
+            styleElem.innerHTML = cssRules.join('\n');
+        }
+
+        async function loadFamilyTree() {
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                
+                let aliveCounter = 0;
+                let deceasedCounter = 0;
+
+                allMembersData = data.map(item => {
+                    let normalizedItemName = normalizeText(item.name);
+                    let sameNameMembers = data.filter(m => normalizeText(m.name) === normalizedItemName);
+                    let displayName = item.name;
+
+                    if (sameNameMembers.length > 1 && item.parentId) {
+                        let father = data.find(m => m.id === item.parentId);
+                        if (father) {
+                            displayName = item.name + " (" + father.name + ")";
+                            let sameNameAndFather = sameNameMembers.filter(m => {
+                                let mFather = data.find(f => f.id === m.parentId);
+                                return mFather && normalizeText(mFather.name) === normalizeText(father.name);
+                            });
+                            if (sameNameAndFather.length > 1 && father.parentId) {
+                                let grandfather = data.find(m => m.id === father.parentId);
+                                if (grandfather) { displayName = item.name + " (" + father.name + " " + grandfather.name + ")"; }
+                            }
+                        }
+                    }
+
+                    let desc = item.description || item.Description || item.info || item.Info || "";
+                    let isDeceased = false;
+                    
+                    if (desc.trim() !== "") {
+                        let lowerDesc = desc.toLowerCase();
+                        if (lowerDesc.includes('مرد') || lowerDesc.includes('کۆچ') || lowerDesc.includes('شەهید') || lowerDesc.includes('وەفات') || lowerDesc.includes('خوالێخۆشبوو') || lowerDesc.includes('منداڵی') || lowerDesc.includes('منداڵ') || lowerDesc.includes('نەماوە') || lowerDesc.includes('تۆپی') || lowerDesc.includes('قەزا')) {
+                            isDeceased = true;
+                        }
+                    }
+
+                    if (isDeceased) {
+                        deceasedCounter++;
+                    } else {
+                        aliveCounter++;
+                    }
+
+                    return { 
+                        ...item, 
+                        displayName: displayName,
+                        color: item.color || item.Color || null,
+                        description: desc,
+                        isDeceased: isDeceased
+                    };
+                });
+                
+                document.getElementById('aliveCount').textContent = aliveCounter;
+                document.getElementById('deceasedCount').textContent = deceasedCounter;
+
+                applyBranchColors(allMembersData);
+                
+                let chartData = allMembersData.map(item => {
+                    let tagsArr = item.branchClass ? [item.branchClass] : [];
+                    return {
+                        id: item.id,
+                        pid: item.parentId,
+                        name: item.displayName, 
+                        img: item.image || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png",
+                        phone: item.phone || "---",
+                        tags: tagsArr,
+                        isDeceased: item.isDeceased,
+                        skullIcon: item.isDeceased ? "💀" : "" // بەکارهێنانی نیشانەکە بۆ ناو قاڵبەکە ڕاستەوخۆ
+                    };
+                });
+
+                if (chart) {
+                    chart.load(chartData);
+                    chart.draw();
+                } else {
+                    chart = new OrgChart(document.getElementById("tree"), {
+                        template: "ana",
+                        enableSearch: false,
+                        mouseScroller: OrgChart.action.scroll,
+                        scale: { extents: { min: 0.2, max: 3 } },
+                        nodeBinding: { 
+                            field_0: "name", 
+                            field_1: "phone",
+                            field_2: "skullIcon", // بەستنەوەی نیشانەکە بە قاڵبەکەوە
+                            img_0: "img"
+                        },
+                        nodes: chartData
+                    });
+
+                    chart.on('click', function(sender, args) {
+                        selectedNodeId = args.node.id;
+                        let member = allMembersData.find(m => m.id === selectedNodeId);
+                        
+                        if (member) {
+                            selectedNodeName = member.displayName;
+                            document.getElementById('detailName').textContent = member.displayName;
+                            document.getElementById('detailImage').src = member.image || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png";
+                            
+                            if (member.phone && member.phone !== '---' && member.phone.trim() !== '') {
+                                document.getElementById('detailPhone').textContent = member.phone;
+                                document.getElementById('detailPhone').classList.remove('hidden');
+                            } else {
+                                document.getElementById('detailPhone').classList.add('hidden');
+                            }
+
+                            const detailDesc = document.getElementById('detailDescription');
+                            if (member.description && member.description.trim() !== '') {
+                                detailDesc.textContent = member.description;
+                                detailDesc.classList.remove('hidden');
+                            } else {
+                                detailDesc.classList.add('hidden');
+                            }
+
+                            const adminActions = document.getElementById('detailAdminActions');
+                            if (isAdminLoggedIn) {
+                                adminActions.classList.remove('hidden');
+                                adminActions.classList.add('flex');
+                            } else {
+                                adminActions.classList.add('hidden');
+                                adminActions.classList.remove('flex');
+                            }
+
+                            document.getElementById('nodeDetailsModal').classList.remove('hidden');
+                        }
+                        return false; 
+                    });
+
+                    // جێگیرکردنی لوتکەی شەجەرە ڕاست لە خوار هیدەرە شینەکەوە لە کاتی کردنەوە
+                    setTimeout(() => {
+                        let rootNode = allMembersData.find(m => !m.parentId || !allMembersData.some(p => p.id == m.parentId));
+                        if (rootNode) {
+                            chart.center(rootNode.id, null, {top: 20});
+                        }
+                    }, 100);
+                }
+            } catch (error) {
+                console.error('کێشە لە هێنانی داتاکان:', error);
+            }
+        }
+
+        function handleSearchInput() {
+            const rawKeyword = document.getElementById('customSearchInput').value;
+            const keyword = normalizeText(rawKeyword);
+            const suggestionsBox = document.getElementById('searchSuggestions');
+            
+            let dynamicStyle = document.getElementById('searchHighlightStyle');
+            if (!dynamicStyle) {
+                dynamicStyle = document.createElement('style');
+                dynamicStyle.id = 'searchHighlightStyle';
+                document.head.appendChild(dynamicStyle);
+            }
+            dynamicStyle.innerHTML = '';
+
+            if (keyword.length === 0) {
+                suggestionsBox.classList.add('hidden');
+                suggestionsBox.innerHTML = '';
+                return;
+            }
+
+            if (chart) {
+                let foundNodes = allMembersData.filter(m => normalizeText(m.displayName).includes(keyword));
+                if (foundNodes.length > 0) {
+                    suggestionsBox.innerHTML = '';
+                    foundNodes.forEach(node => {
+                        let li = document.createElement('li');
+                        li.className = 'px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm font-medium text-gray-700 transition';
+                        li.textContent = node.displayName; 
+                        li.onclick = () => selectSearchResult(node.id, node.displayName);
+                        suggestionsBox.appendChild(li);
+                    });
+                    suggestionsBox.classList.remove('hidden');
+                } else {
+                    suggestionsBox.innerHTML = '<li class="px-4 py-3 text-gray-500 text-xs text-center">هیچ ناوێک نەدۆزرایەوە</li>';
+                    suggestionsBox.classList.remove('hidden');
+                }
+            }
+        }
+
+        function selectSearchResult(id, displayName) {
+            const input = document.getElementById('customSearchInput');
+            const suggestionsBox = document.getElementById('searchSuggestions');
+            let dynamicStyle = document.getElementById('searchHighlightStyle');
+            
+            input.value = displayName;
+            suggestionsBox.classList.add('hidden');
+
+            if (chart) {
+                dynamicStyle.innerHTML = `
+                    [data-n-id="${id}"] rect { fill: #fef08a !important; stroke: #ca8a04 !important; transition: all 0.3s ease; }
+                    [data-n-id="${id}"] text { fill: #854d0e !important; }
+                `;
+                chart.center(id);
+            }
+        }
+
+        document.addEventListener('click', function(event) {
+            const searchInput = document.getElementById('customSearchInput');
+            const suggestionsBox = document.getElementById('searchSuggestions');
+            if (event.target !== searchInput && !suggestionsBox.contains(event.target)) {
+                suggestionsBox.classList.add('hidden');
+            }
+            const infoModal = document.getElementById('infoModal');
+            const shareModal = document.getElementById('shareModal');
+            const nodeModal = document.getElementById('nodeDetailsModal');
+            if (event.target === infoModal) closeInfoModal();
+            if (event.target === shareModal) closeShareModal();
+            if (event.target === nodeModal) closeNodeDetailsModal();
+        });
+
+        function closeNodeDetailsModal() { document.getElementById('nodeDetailsModal').classList.add('hidden'); }
+        function closeActionModal() { document.getElementById('actionModal').classList.add('hidden'); }
+
+        function openAddForm(type) {
+            closeNodeDetailsModal();
+            document.getElementById('addModal').classList.remove('hidden');
+            document.getElementById('addMemberForm').reset();
+            document.getElementById('targetMemberId').value = selectedNodeId || "";
+            document.getElementById('actionType').value = type;
+            document.getElementById('newColor').value = "#2563eb"; 
+            document.getElementById('newDescription').value = ""; 
+            
+            if (type === 'root') { document.getElementById('modalTitle').textContent = "زیادکردنی سەرەتای شەجەرە (سەرۆک)"; }
+            else if (type === 'son') { document.getElementById('modalTitle').textContent = "زیادکردنی کوڕ بۆ (" + selectedNodeName + ")"; }
+            else if (type === 'father') { document.getElementById('modalTitle').textContent = "زیادکردنی باوک (بۆ سەرووی " + selectedNodeName + ")"; }
+        }
+
+        function openEditForm() {
+            closeNodeDetailsModal();
+            let member = allMembersData.find(m => m.id === selectedNodeId);
+            if(!member) return;
+            document.getElementById('addModal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = "دەستکاریکردنی زانیارییەکان";
+            document.getElementById('newName').value = member.name || "";
+            document.getElementById('newImage').value = (member.image && !member.image.includes('blank-profile')) ? member.image : "";
+            document.getElementById('newPhone').value = (member.phone && member.phone !== '---') ? member.phone : "";
+            document.getElementById('newColor').value = member.color || "#2563eb";
+            document.getElementById('newDescription').value = member.description || ""; 
+            
+            document.getElementById('targetMemberId').value = selectedNodeId;
+            document.getElementById('actionType').value = 'edit';
+        }
+
+        function confirmDeleteMember() {
+            closeNodeDetailsModal();
+            if (confirm("ئایا دڵنیایت لە سڕینەوەی (" + selectedNodeName + ")؟")) { deleteMember(selectedNodeId); }
+        }
+
+        function closeModal() { document.getElementById('addModal').classList.add('hidden'); }
+
+        async function submitForm(e) {
+            e.preventDefault();
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+            btn.textContent = "چاوەڕێ بە...";
+
+            const actionType = document.getElementById('actionType').value;
+            const targetId = document.getElementById('targetMemberId').value;
+            const pickedColor = document.getElementById('newColor').value;
+            const typedDescription = document.getElementById('newDescription').value;
+            
+            let finalParentId = null;
+            let method = 'POST';
+            let apiUrlFinal = apiUrl;
+
+            if (actionType === 'edit') {
+                let existingMember = allMembersData.find(m => m.id === targetId);
+                finalParentId = existingMember ? existingMember.parentId : null;
+                method = 'PUT';
+                let cleanId = targetId.toString().replace('node_', '');
+                apiUrlFinal = `${apiUrl}/${cleanId}`;
+            } else if (actionType === 'root') {
+                finalParentId = null;
+            } else if (actionType === 'son') {
+                finalParentId = targetId;
+            } else if (actionType === 'father') {
+                let targetMember = allMembersData.find(m => m.id === targetId);
+                finalParentId = targetMember ? targetMember.parentId : null;
+            }
+
+            const memberData = {
+                Name: document.getElementById('newName').value,
+                ParentId: finalParentId,
+                Image: document.getElementById('newImage').value || null,
+                Phone: document.getElementById('newPhone').value || null,
+                Color: pickedColor,
+                Description: typedDescription || null 
+            };
+
+            try {
+                const response = await fetch(apiUrlFinal, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(memberData)
+                });
+
+                if (response.ok) {
+                    if (actionType === 'father' && targetId) {
+                        const freshRes = await fetch(apiUrl);
+                        const freshData = await freshRes.json();
+                        let newFatherObj = freshData[freshData.length - 1];
+                        let oldChildObj = allMembersData.find(m => m.id === targetId);
+                        if (newFatherObj && oldChildObj) {
+                            await fetch(`${apiUrl}/${oldChildObj.id.replace('node_', '')}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    Name: oldChildObj.name, 
+                                    ParentId: newFatherObj.id, 
+                                    Image: oldChildObj.image, 
+                                    Phone: oldChildObj.phone, 
+                                    Color: oldChildObj.color,
+                                    Description: oldChildObj.description
+                                })
+                            });
+                        }
+                    }
+                    closeModal();
+                    loadFamilyTree();
+                    if (actionType === 'edit') { alert('زانیارییەکان بە سەرکەوتوویی نوێکرانەوە!'); }
+                    else { alert('ناو بە سەرکەوتوویی زیاد کرا!'); }
+                } else {
+                    alert('کێشەیەک ڕوویدا.');
+                }
+            } catch (error) {
+                alert('پەیوەندی بە سێرڤەرەوە پچڕاوە.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "پاشەکەوتکردن";
+            }
+        }
+
+        async function deleteMember(id) {
+            try {
+                const response = await fetch(`${apiUrl}/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    alert('ناو بە سەرکەوتوویی سڕایەوە!');
+                    loadFamilyTree();
+                } else {
+                    alert('هەڵەیەک ڕوویدا لە کاتی سڕینەوەدا.');
+                }
+            } catch (error) {
+                alert('پەیوەندی بە سێرڤەرەوە پچڕاوە.');
+            }
+        }
+    </script>
+</body>
+</html>
